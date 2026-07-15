@@ -53,3 +53,34 @@ def get_all_transactions(db_path: Optional[Path] = None) -> pd.DataFrame:
 def count_transactions(db_path: Optional[Path] = None) -> int:
     with get_connection(db_path) as conn:
         return conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
+
+
+def get_distinct_accounts(db_path: Optional[Path] = None) -> list[str]:
+    with get_connection(db_path) as conn:
+        rows = conn.execute("SELECT DISTINCT account FROM transactions ORDER BY account").fetchall()
+    return [row[0] for row in rows]
+
+
+def flip_account_sign(account: str, db_path: Optional[Path] = None) -> int:
+    """Invert the amount sign for every transaction on one account.
+
+    Use this to correct an account that was imported with the wrong sign
+    convention (expenses positive instead of negative, or vice versa) instead
+    of re-importing. Recomputes each row's dedup hash to match its new sign,
+    so future imports of the same account still detect duplicates correctly.
+
+    Returns the number of transactions updated.
+    """
+    with get_connection(db_path) as conn:
+        rows = conn.execute(
+            "SELECT id, date, description, amount FROM transactions WHERE account = ?",
+            (account,),
+        ).fetchall()
+        for tx_id, date_str, description, amount in rows:
+            new_amount = -amount
+            new_hash = compute_dedup_hash(date_str, description, new_amount, account)
+            conn.execute(
+                "UPDATE transactions SET amount = ?, dedup_hash = ? WHERE id = ?",
+                (new_amount, new_hash, tx_id),
+            )
+    return len(rows)

@@ -2,9 +2,10 @@
 import pandas as pd
 import streamlit as st
 
+from wealth_os.categorization import apply_rules
 from wealth_os.config import APP_TITLE
 from wealth_os.db import init_db
-from wealth_os.transactions import insert_transactions
+from wealth_os.transactions import flip_account_sign, get_distinct_accounts, insert_transactions
 
 st.set_page_config(page_title=f"Import — {APP_TITLE}", layout="wide")
 init_db()
@@ -64,6 +65,26 @@ if uploaded_file is not None:
         inserted, skipped = insert_transactions(
             st.session_state["pending_import"], st.session_state["pending_account"]
         )
-        st.success(f"Imported {inserted} new transactions ({skipped} duplicates skipped).")
+        categorized = apply_rules()
+        st.success(
+            f"Imported {inserted} new transactions ({skipped} duplicates skipped). "
+            f"Auto-categorized {categorized} of them using existing rules."
+        )
         del st.session_state["pending_import"]
         del st.session_state["pending_account"]
+
+st.divider()
+st.subheader("Fix sign convention")
+st.caption(
+    "By convention, expenses are stored as negative amounts and income as positive. "
+    "If an account came in backwards — spending shows up positive — fix it here "
+    "instead of re-importing. Safe to click twice; it just flips the sign back."
+)
+accounts = get_distinct_accounts()
+if accounts:
+    fix_account = st.selectbox("Account", accounts, key="fix_sign_account")
+    if st.button(f"Flip sign for all '{fix_account}' transactions"):
+        flipped = flip_account_sign(fix_account)
+        st.success(f"Flipped the sign on {flipped} transactions for '{fix_account}'.")
+else:
+    st.write("No transactions imported yet.")
