@@ -21,13 +21,28 @@ if len(transactions) == 0:
 transactions["category"] = transactions["category"].fillna("Uncategorized")
 transactions["date"] = pd.to_datetime(transactions["date"])
 
-st.subheader("Filters")
-col1, col2, col3, col4 = st.columns(4)
-min_date, max_date = transactions["date"].min().date(), transactions["date"].max().date()
-with col1:
-    date_range = st.date_input(
-        "Date range", value=(min_date, max_date), min_value=min_date, max_value=max_date
+st.subheader("Period")
+period_type = st.radio("Period", ["Month", "Year to date", "All time"], horizontal=True, label_visibility="collapsed")
+
+if period_type == "Month":
+    available_months = sorted(transactions["date"].dt.to_period("M").astype(str).unique(), reverse=True)
+    selected_month = st.selectbox(
+        "Month",
+        available_months,
+        format_func=lambda m: pd.Period(m).strftime("%B %Y"),
     )
+    period = pd.Period(selected_month)
+    period_start, period_end = period.start_time.date(), period.end_time.date()
+elif period_type == "Year to date":
+    latest = transactions["date"].max()
+    period_start = pd.Timestamp(year=latest.year, month=1, day=1).date()
+    period_end = latest.date()
+else:
+    period_start = transactions["date"].min().date()
+    period_end = transactions["date"].max().date()
+
+st.subheader("Filters")
+col2, col3, col4 = st.columns(3)
 with col2:
     accounts = st.multiselect("Account", sorted(transactions["account"].unique()))
 with col3:
@@ -35,10 +50,9 @@ with col3:
 with col4:
     search = st.text_input("Description contains")
 
-filtered = transactions.copy()
-if isinstance(date_range, tuple) and len(date_range) == 2:
-    start, end = date_range
-    filtered = filtered[(filtered["date"].dt.date >= start) & (filtered["date"].dt.date <= end)]
+filtered = transactions[
+    (transactions["date"].dt.date >= period_start) & (transactions["date"].dt.date <= period_end)
+].copy()
 if accounts:
     filtered = filtered[filtered["account"].isin(accounts)]
 if categories:
@@ -60,20 +74,25 @@ k4.metric("Transactions", len(filtered))
 
 st.divider()
 
-st.subheader("Monthly spend by category")
-monthly = monthly_category_totals(filtered)
-if len(monthly) == 0:
-    st.write("No spending in this range.")
-else:
-    fig = px.bar(monthly, x="month", y="spend", color="category", barmode="stack")
-    st.plotly_chart(fig, width="stretch")
+if period_type != "Month":
+    st.subheader("Monthly spend by category")
+    monthly = monthly_category_totals(filtered)
+    if len(monthly) == 0:
+        st.write("No spending in this range.")
+    else:
+        fig = px.bar(monthly, x="month", y="spend", color="category", barmode="stack")
+        st.plotly_chart(fig, width="stretch")
 
+chart_type = st.radio("Chart type", ["Bar", "Pie"], horizontal=True)
 st.subheader("Category breakdown")
 breakdown = category_breakdown(filtered)
 if len(breakdown) == 0:
     st.write("No spending in this range.")
-else:
+elif chart_type == "Bar":
     fig2 = px.bar(breakdown, x="category", y="spend")
+    st.plotly_chart(fig2, width="stretch")
+else:
+    fig2 = px.pie(breakdown, names="category", values="spend")
     st.plotly_chart(fig2, width="stretch")
 
 st.divider()

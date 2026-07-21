@@ -6,7 +6,8 @@ entirely on your own machine, with no financial data ever leaving it.
 
 ## Status
 
-🚧 Early development (v1 in progress). Current capability: project scaffold only.
+🚧 Early development (v1 in progress). See [SPEC.md](SPEC.md) for the full,
+up-to-date list of implemented features, data model, and conventions.
 
 ## Why local-first
 
@@ -16,9 +17,12 @@ git-ignored so personal financial data never enters version control.
 
 ## Setup
 
+Requires Python 3.10 (pinned in `.python-version` — see [SPEC.md §2](SPEC.md#2-tech-stack--environment)
+for why).
+
 ```bash
 cd wealth-os
-python3 -m venv venv
+python3.10 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 ```
@@ -45,13 +49,12 @@ wealth-os/
 ## Roadmap
 
 - [x] Project scaffold
-- [ ] CSV import for bank transactions
-- [ ] Rule-based categorization
-- [ ] Spending dashboard with drill-down
-- [ ] Manual asset/liability tracking and net worth view
+- [x] CSV import for bank transactions
+- [x] Rule-based categorization
+- [x] Spending dashboard with drill-down
+- [x] Manual asset/liability tracking and net worth view
 - [ ] Investment exposure summary
 - [ ] 10/15/20-year wealth projection
 
-Deliberately not building (yet): bank/broker API integrations, multi-user support,
-mobile app, cloud sync, AI-generated financial advice, tax optimization, Monte Carlo
-simulation.
+See [SPEC.md](SPEC.md) for exact feature behavior, and §9 for what's deliberately out
+of scope for v1.

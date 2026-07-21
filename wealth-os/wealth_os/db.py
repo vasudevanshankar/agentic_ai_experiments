@@ -29,6 +29,27 @@ CREATE TABLE IF NOT EXISTS rules (
     priority INTEGER NOT NULL DEFAULT 100,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS net_worth_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    type TEXT NOT NULL CHECK (type IN ('asset', 'liability')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS net_worth_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    item_id INTEGER NOT NULL REFERENCES net_worth_items(id) ON DELETE CASCADE,
+    date TEXT NOT NULL,
+    value REAL NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(item_id, date)
+);
 """
 
 
@@ -59,3 +80,20 @@ def init_db(db_path: Optional[Path] = None) -> None:
     """Create tables if they don't already exist. Safe to call on every startup."""
     with get_connection(db_path) as conn:
         conn.executescript(SCHEMA)
+        _backfill_categories(conn)
+
+
+def _backfill_categories(conn: sqlite3.Connection) -> None:
+    """Populate the categories table from any category strings already in use.
+
+    The categories table was added after transactions/rules already stored
+    free-text category names, so this keeps existing data's categories from
+    silently disappearing from the managed list on upgrade.
+    """
+    used_categories = set()
+    for row in conn.execute("SELECT DISTINCT category FROM transactions WHERE category IS NOT NULL"):
+        used_categories.add(row[0])
+    for row in conn.execute("SELECT DISTINCT category FROM rules"):
+        used_categories.add(row[0])
+    for name in used_categories:
+        conn.execute("INSERT OR IGNORE INTO categories (name) VALUES (?)", (name,))

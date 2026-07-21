@@ -10,10 +10,12 @@ from typing import Optional
 
 import pandas as pd
 
+from wealth_os.categories import add_category
 from wealth_os.db import get_connection
 
 
 def add_rule(pattern: str, category: str, priority: int = 100, db_path: Optional[Path] = None) -> None:
+    add_category(category, db_path)
     with get_connection(db_path) as conn:
         conn.execute(
             "INSERT INTO rules (pattern, category, priority) VALUES (?, ?, ?)",
@@ -64,7 +66,7 @@ def apply_rules(db_path: Optional[Path] = None) -> int:
     return updated
 
 
-def set_category(transaction_id: int, category: str, db_path: Optional[Path] = None) -> None:
-    """Manually set a single transaction's category (a one-off override)."""
+def set_category(transaction_id: int, category: Optional[str], db_path: Optional[Path] = None) -> None:
+    """Manually set (or clear, with category=None) a single transaction's category."""
     with get_connection(db_path) as conn:
         conn.execute("UPDATE transactions SET category = ? WHERE id = ?", (category, transaction_id))
